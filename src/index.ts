@@ -1,9 +1,21 @@
 import express from 'express';
 import type { Request, Response } from 'express';
-import { isNullOrUndefined, createUniqueId } from './utils/common-utils';
+import { isNullOrUndefined, createUniqueId } from '@/utils/common-utils';
+import { loggerMiddleware } from '@/middlewares/logger-middleware';
+import { AuthMiddeware } from './middlewares/auth-middleware';
+
+import { connectToDb } from './services/data/database-connection';
+import {
+  createUser,
+  getUser,
+  getUserById,
+} from './controllers/user-controller';
 
 const app = express();
 app.use(express.json());
+app.use(loggerMiddleware);
+
+connectToDb();
 
 const PORT = 5000;
 
@@ -34,72 +46,13 @@ let userDetails = [
   },
 ];
 
-app.get('/user', (req: Request, res: Response) => {
-  const { name, team } = req.query;
+app.get('/user', getUser);
 
-  let filteredUserDetails = userDetails;
+app.get('/user/:id', getUserById);
 
-  if (!isNullOrUndefined(name)) {
-    const nameLowerCase = (name as string).toLowerCase();
+app.post('/user', AuthMiddeware, createUser);
 
-    filteredUserDetails = filteredUserDetails.filter((user) =>
-      user.name.toLowerCase().startsWith(nameLowerCase)
-    );
-  }
-
-  if (!isNullOrUndefined(team)) {
-    const teamLowerCase = (team as string).toLowerCase();
-
-    filteredUserDetails = filteredUserDetails.filter(
-      (user) => user.team.toLowerCase() === teamLowerCase
-    );
-  }
-
-  res.send(filteredUserDetails);
-});
-
-app.get('/user/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  const availableUserDetail = userDetails.find(
-    (user) => user.id === Number(id)
-  );
-
-  if (isNullOrUndefined(availableUserDetail)) {
-    res.status(404).send({
-      status: 'fail',
-      message: 'User not found',
-    });
-    return;
-  }
-
-  res.send(availableUserDetail);
-  return;
-});
-
-app.post('/user', (req: Request, res: Response) => {
-  const user = req.body;
-
-  const { name, team, role } = user;
-  if (!name || !team || !role) {
-    res.status(400).send({
-      status: 'fail',
-      message: 'Please provide all the details',
-    });
-
-    return;
-  }
-
-  const id = createUniqueId(userDetails);
-
-  const newUser = { ...user, id };
-
-  userDetails.push(newUser);
-
-  res.send({ status: 'success', message: 'User created successfully' });
-});
-
-app.put('/user/:id', (req: Request, res: Response) => {
+app.put('/user/:id', AuthMiddeware, (req: Request, res: Response) => {
   const { id } = req.params;
   const user = req.body;
 
@@ -129,7 +82,7 @@ app.put('/user/:id', (req: Request, res: Response) => {
   res.send({ status: 'success', message: 'User updated successfully' });
 });
 
-app.patch('/user/:id', (req: Request, res: Response) => {
+app.patch('/user/:id', AuthMiddeware, (req: Request, res: Response) => {
   const { id } = req.params;
   const user = req.body;
 
@@ -155,6 +108,27 @@ app.patch('/user/:id', (req: Request, res: Response) => {
   });
 
   res.send({ status: 'success', message: 'User updated successfully' });
+});
+
+app.delete('/user/:id', AuthMiddeware, (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const availableUserDetail = userDetails.find(
+    (user) => user.id === Number(id)
+  );
+
+  if (!availableUserDetail) {
+    res.status(404).send({ status: 'fail', message: 'User not found' });
+    return;
+  }
+
+  userDetails = userDetails.filter((user) => user.id !== Number(id));
+
+  res.send({
+    status: 'success',
+    message: 'User deleted successfully',
+    data: availableUserDetail,
+  });
 });
 
 app.listen(PORT, () => {
