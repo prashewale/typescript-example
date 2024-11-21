@@ -10,7 +10,7 @@ export function AuthMiddeware(req: Request, res: Response, next: NextFunction) {
     return;
   }
 
-  if (authHeader != 'Test123') {
+  if (authHeader != 'Test12345') {
     res.status(401).send({
       status: 'fail',
       message: 'Invalid Token',

@@ -1,32 +1,40 @@
 //mongodb and mongoose
 import { MongoClient, Db } from 'mongodb';
-import dotenv from 'dotenv';
-dotenv.config();
 
-const connectionUrl = process.env.MONGODB_URL;
+export class DatabaseClient {
+  private static client: MongoClient | null;
+  private static db: Db | null;
 
-if (!connectionUrl) {
-  throw new Error('MongoDB connection url not found');
-}
+  static async connect(url: string, dbName: string): Promise<Db> {
+    if (!this.client) {
+      this.client = new MongoClient(url);
+      await this.client.connect();
 
-const dbName = process.env.DB_NAME;
+      this.db = this.client.db(dbName);
+    }
 
-if (!dbName) {
-  throw new Error('Database name not found');
-}
+    if (!this.db) {
+      throw new Error('Database connection not establised.');
+    }
 
-const client = new MongoClient(connectionUrl);
-let db: Db;
-
-export const connectToDb = async () => {
-  try {
-    await client.connect();
-    db = client.db(dbName);
-    console.log('Connected to MongoDB');
-  } catch (err) {
-    console.log('Error connecting to MongoDB', err);
-    throw err;
+    return this.db;
   }
-};
 
-export const getDb = () => db;
+  static getDb(): Db {
+    if (!this.db) {
+      throw new Error('Database connection not establised.');
+    }
+
+    return this.db;
+  }
+
+  static async close() {
+    if (!this.client) {
+      return;
+    }
+
+    await this.client.close();
+    this.client = null;
+    this.db = null;
+  }
+}
