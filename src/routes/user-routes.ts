@@ -8,7 +8,7 @@ export class UserRoute {
     {
       path: '/user',
       method: RequestMethod.GET,
-      handler: this._userController.getUser,
+      handler: this._userController.getUsers,
     },
     {
       path: '/user/:id',

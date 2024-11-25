@@ -1,57 +1,34 @@
 import { DatabaseClient } from '@/services/data/database-connection';
+import { UserRepository } from '@/services/repo-services/user-repository';
 import { isNullOrUndefined } from '@/utils/common-utils';
 import { Request, Response } from 'express';
-import { Document, ObjectId, WithId } from 'mongodb';
+import { Document, Filter, ObjectId, WithId } from 'mongodb';
 
 export class UserController {
-  getUser = async (req: Request, res: Response) => {
-    const collection = await getUserCollection();
+  constructor(private _userRepo: UserRepository) {}
 
+  getUsers = async (req: Request, res: Response) => {
     const { name, team } = req.query;
-    let filteredUserDetails: WithId<Document>[] = [];
 
-    if (!name && !team) {
-      filteredUserDetails = await collection.find().toArray();
+    const filter = [] as Filter<Document>[];
+
+    if (name) {
+      filter.push({ name: { $regex: name, $options: 'i' } });
     }
 
-    if (!name && team) {
-      filteredUserDetails = await collection
-        .find({ team: { $regex: team, $options: 'i' } })
-        .toArray();
+    if (team) {
+      filter.push({ team: { $regex: team, $options: 'i' } });
     }
 
-    if (name && !team) {
-      filteredUserDetails = await collection
-        .find({ name: { $regex: name, $options: 'i' } })
-        .toArray();
-    }
+    const userDetails = await this._userRepo.getUsers(filter);
 
-    if (name && team) {
-      filteredUserDetails = await collection
-        .find({
-          $and: [
-            { name: { $regex: name, $options: 'i' } },
-            { team: { $regex: team, $options: 'i' } },
-          ],
-        })
-        .toArray();
-    }
-
-    res.send(filteredUserDetails);
+    res.send(userDetails);
   };
 
   getUserById = async (req: Request, res: Response) => {
-    const collection = await getUserCollection();
-
     const { id } = req.params;
 
-    const availableUserDetail = await collection.findOne({
-      _id: new ObjectId(id),
-    });
-
-    // const availableUserDetail = userDetails.find(
-    //   (user) => user.id === Number(id)
-    // );
+    const availableUserDetail = await this._userRepo.getUserById(id);
 
     if (isNullOrUndefined(availableUserDetail)) {
       res.status(404).send({
@@ -66,9 +43,16 @@ export class UserController {
   };
 
   createUser = async (req: Request, res: Response) => {
-    const collection = await getUserCollection();
+    const user = req.body as User;
 
-    const user = req.body;
+    if (!user) {
+      res.status(400).send({
+        status: 'fail',
+        message: 'Please provide all the details',
+      });
+
+      return;
+    }
 
     const { name, team, role } = user;
     if (!name || !team || !role) {
@@ -80,11 +64,7 @@ export class UserController {
       return;
     }
 
-    const insertedUser = await collection.insertOne(user);
-
-    const availableUserDetail = await collection.findOne({
-      _id: new ObjectId(insertedUser.insertedId),
-    });
+    const availableUserDetail = await this._userRepo.createUser(user);
 
     res.send({
       status: 'success',
@@ -210,8 +190,3 @@ export class UserController {
     });
   };
 }
-
-const getUserCollection = async () => {
-  const db = DatabaseClient.getDb();
-  return db.collection('users');
-};

@@ -10,6 +10,7 @@ import { UserController } from './controllers/user-controller';
 
 import { env } from '@utils/config';
 import { UserRoute } from './routes/user-routes';
+import { UserRepository } from './services/repo-services/user-repository';
 
 const app = express();
 app.use(express.json());
@@ -18,7 +19,9 @@ app.use(loggerMiddleware);
 DatabaseClient.connect(env.MONGODB_URL, env.DB_NAME);
 
 const PORT = 5000;
-const userController = new UserController();
+
+const userRepo = new UserRepository();
+const userController = new UserController(userRepo);
 const userRoute = new UserRoute(userController);
 const userRouter = userRoute.registerRoutes();
 
